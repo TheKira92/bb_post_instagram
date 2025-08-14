@@ -93,16 +93,37 @@ class _PieceDropdown extends StatelessWidget {
   final ValueChanged<Piece?> onChanged;
   const _PieceDropdown({super.key, required this.pieces, required this.value, required this.onChanged});
 
+
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<Piece>(
       value: value,
       isExpanded: true,
       items: pieces.map((p) {
-        final isSvg = p.linkPng.toLowerCase().endsWith('.svg');
-        final thumb = SizedBox(
-          width: 32, height: 32,
-          child: isSvg ? SvgPicture.network(p.linkPng) : Image.network(p.linkPng),
+      final isSvg = p.linkPng.toLowerCase().endsWith('.svg');
+      final thumb = SizedBox(
+        width: 32,
+        height: 32,
+        child: isSvg
+            ? SvgPicture.network(
+                p.linkPng,
+                placeholderBuilder: (_) => const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+              )
+            : Image.network(
+                p.linkPng,
+                fit: BoxFit.contain,
+                // ⬇️ fallback + log chiaro se l’URL è sbagliato o l’immagine non è valida
+                errorBuilder: (_, __, ___) {
+                  debugPrint('[IMG ERROR] ${p.linkPng}');
+                  return Container(
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.black54),
+                    ),
+                    child: const Icon(Icons.broken_image, size: 16),
+                  );
+                },
+              ),
         );
         return DropdownMenuItem(value: p, child: Row(children: [
           thumb, const SizedBox(width: 12), Expanded(child: Text('${p.nome}  •  ${p.categoria.toUpperCase()}/${p.tipoBey}')),

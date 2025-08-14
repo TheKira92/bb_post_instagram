@@ -1,14 +1,55 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'repository.dart';
 import 'app_state.dart';
 import 'evento_page.dart';
 import 'beyblade_page.dart';
 import 'preview_page.dart';
+import 'data/asset_sync.dart';
+import 'data/catalog_index.dart';
+import 'data/assets_config.dart';
+import 'data/image_resolver.dart';
+import 'data/manifest_to_piece.dart';
+import 'data/manifest_store.dart';
 
-void main() {
-  runApp(ChangeNotifierProvider(create: (_) => AppState(), child: const MyApp()));
+late CatalogIndex catalogIndex;
+late ImageResolver imageResolver;
+
+Future<void> initCatalog() async {
+  final sync = await AssetSync.create();
+  await sync.run(onLog: (m) => debugPrint('[SYNC] $m'));
+
+  final store = sync.store;
+  final manifest = await store.readManifest();
+  final imagesRoot = imagesRootFromManifestUrl(sync.remote.manifestUrl); // ⬅️ QUI
+
+  catalogIndex = CatalogIndex(manifest);
+  imageResolver = ImageResolver(store: store, imagesRootUrl: imagesRoot);
 }
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await initCatalog();
+
+  final store = await ManifestStore.open();
+  final manifest = await store.readManifest();
+  // final meta = await store.readMeta(); // opzionale
+
+  final imagesRoot = imagesRootFromManifestUrl(kAssetsManifestUrl); // ⬅️ QUI
+
+  final pieces = piecesFromManifest(manifest, imagesRoot);
+
+  runApp(ChangeNotifierProvider(
+    create: (_) {
+      final s = AppState();
+      s.setDataset(pieces);
+      return s;
+    },
+    child: const MyApp(),
+  ));
+}
+
+
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -34,14 +75,6 @@ class _ShellState extends State<Shell> {
   @override
   void initState() {
     super.initState();
-    _loadCsv();
-  }
-
-  Future<void> _loadCsv() async {
-    final repo = PiecesRepository();
-    final list = await repo.loadFromAssets('assets/components_test_placeholder.csv');
-    if (!mounted) return;
-    context.read<AppState>().setDataset(list);
   }
 
   @override
